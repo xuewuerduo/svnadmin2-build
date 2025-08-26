@@ -1,0 +1,137 @@
+name: Check Remote Release and Create Release with Docker Images
+
+on:
+  schedule:
+    # 每4小时运行一次
+    - cron: '0 */4 * * *'
+  workflow_dispatch:
+
+jobs:
+  check-release-and-create:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # 获取所有历史记录以便检查现有标签
+
+      - name: Get latest release from remote repository
+        id: get_remote_release
+        run: |
+          # 获取远程仓库的最新release
+          response=$(curl -s https://api.github.com/repos/witersen/SvnAdminV2.0/releases/latest)
+          latest_release_tag=$(echo $response | jq -r '.tag_name')
+          latest_release_name=$(echo $response | jq -r '.name')
+          latest_release_body=$(echo $response | jq -r '.body')
+          latest_release_url=$(echo $response | jq -r '.html_url')
+          
+          # 检查版本名称是否包含"update"等英文字段
+          if [[ "$latest_release_tag" == *[Uu][Pp][Dd][Aa][Tt][Ee]* ]] || [[ "$latest_release_name" == *[Uu][Pp][Dd][Aa][Tt][Ee]* ]]; then
+            echo "Latest release contains 'update' keyword, skipping"
+            echo "skip=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          echo "latest_release_tag=$latest_release_tag" >> $GITHUB_OUTPUT
+          echo "latest_release_name=$latest_release_name" >> $GITHUB_OUTPUT
+          echo "latest_release_body=$latest_release_body" >> $GITHUB_OUTPUT
+          echo "latest_release_url=$latest_release_url" >> $GITHUB_OUTPUT
+          echo "skip=false" >> $GITHUB_OUTPUT
+
+      - name: Check if release already exists in this repository
+        if: steps.get_remote_release.outputs.skip == 'false'
+        id: check_local_release
+        run: |
+          # 检查本地是否已有该标签
+          if git rev-parse -q --verify "refs/tags/${{ steps.get_remote_release.outputs.latest_release_tag }}" >/dev/null; then
+            echo "Release already exists in local repository"
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "Release does not exist in local repository"
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create new tag and release
+        if: steps.get_remote_release.outputs.skip == 'false' && steps.check_local_release.outputs.exists == 'false'
+        run: |
+          # 配置git
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          
+          # 创建标签
+          git tag ${{ steps.get_remote_release.outputs.latest_release_tag }}
+          git push origin ${{ steps.get_remote_release.outputs.latest_release_tag }}
+
+      - name: Create Release
+        if: steps.get_remote_release.outputs.skip == 'false' && steps.check_local_release.outputs.exists == 'false'
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.get_remote_release.outputs.latest_release_tag }}
+          release_name: ${{ steps.get_remote_release.outputs.latest_release_name }}
+          body: |
+            同步自 [witersen/SvnAdminV2.0](${{ steps.get_remote_release.outputs.latest_release_url }}) 的更新:
+            
+            ${{ steps.get_remote_release.outputs.latest_release_body }}
+            
+            ---
+            
+            此版本由自动化工作流同步创建。
+          draft: false
+          prerelease: false
+
+      # 构建并推送Docker镜像
+      - name: Set up Docker Buildx
+        if: steps.get_remote_release.outputs.skip == 'false' && steps.check_local_release.outputs.exists == 'false'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to DockerHub
+        if: steps.get_remote_release.outputs.skip == 'false' && steps.check_local_release.outputs.exists == 'false'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Login to GitHub Container Registry
+        if: steps.get_remote_release.outputs.skip == 'false' && steps.check_local_release.outputs.exists == 'false'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get current date
+        if: steps.get_remote_release.outputs.skip == 'false' && steps.check_local_release.outputs.exists == 'false'
+        id: date
+        run: echo "date=$(date +'%Y%m%d')" >> $GITHUB_OUTPUT
+
+      # 构建并推送Build-Docker镜像
+      - name: Build and push Build-Docker image
+        if: steps.get_remote_release.outputs.skip == 'false' && steps.check_local_release.outputs.exists == 'false'
+        uses: docker/build-push-action@v5
+        with:
+          context: ./Build-Docker
+          push: true
+          tags: |
+            xuewuerduo/svnadmin2:latest
+            xuewuerduo/svnadmin2:${{ steps.get_remote_release.outputs.latest_release_tag }}
+            xuewuerduo/svnadmin2:${{ steps.date.outputs.date }}
+            ghcr.io/${{ github.repository_owner }}/svnadmin2:latest
+            ghcr.io/${{ github.repository_owner }}/svnadmin2:${{ steps.get_remote_release.outputs.latest_release_tag }}
+            ghcr.io/${{ github.repository_owner }}/svnadmin2:${{ steps.date.outputs.date }}
+
+      # 构建并推送Build-Docker-kotel镜像
+      - name: Build and push Build-Docker-kotel image
+        if: steps.get_remote_release.outputs.skip == 'false' && steps.check_local_release.outputs.exists == 'false'
+        uses: docker/build-push-action@v5
+        with:
+          context: ./Build-Docker-kotel
+          push: true
+          tags: |
+            xuewuerduo/svnadmin2-kotel:latest
+            xuewuerduo/svnadmin2-kotel:${{ steps.get_remote_release.outputs.latest_release_tag }}
+            xuewuerduo/svnadmin2-kotel:${{ steps.date.outputs.date }}
+            ghcr.io/${{ github.repository_owner }}/svnadmin2-kotel:latest
+            ghcr.io/${{ github.repository_owner }}/svnadmin2-kotel:${{ steps.get_remote_release.outputs.latest_release_tag }}
+            ghcr.io/${{ github.repository_owner }}/svnadmin2-kotel:${{ steps.date.outputs.date }}
