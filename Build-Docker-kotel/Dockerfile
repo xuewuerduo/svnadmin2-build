@@ -16,7 +16,7 @@ COPY Build-Docker-kotel/01.web/ 01.web/
 COPY Build-Docker-kotel/02.php/ 02.php/
 
 RUN cd 01.web; \
-    # rm -rf package-lock.json; \
+    rm -rf package-lock.json; \
     npm install; \
     npm run build; \
     # 验证构建结果 \
