@@ -1,4 +1,4 @@
-name: Check Remote Release and Create Release with Docker Images
+name: 检查远程发布并使用 Docker 镜像创建发布版本
 
 on:
   schedule:
@@ -18,7 +18,7 @@ jobs:
         with:
           fetch-depth: 0  # 获取所有历史记录以便检查现有标签
 
-      - name: Get latest release from remote repository
+      - name: 从远程仓库获取最新发布版本
         id: get_remote_release
         run: |
           # 获取远程仓库的所有release列表
@@ -62,7 +62,7 @@ jobs:
           echo "skip=false" >> $GITHUB_OUTPUT
 
 
-      - name: Check if release already exists in this repository
+      - name: 检查此仓库中是否已存在该发布版本
         if: steps.get_remote_release.outputs.skip == 'false'
         id: check_local_release
         run: |
@@ -75,7 +75,7 @@ jobs:
             echo "exists=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Create new tag and release
+      - name: 创建新标签并发布（版本）
         if: steps.get_remote_release.outputs.skip == 'false' && steps.check_local_release.outputs.exists == 'false'
         run: |
           # 配置git
@@ -84,9 +84,9 @@ jobs:
           
           # 创建标签
           git tag ${{ steps.get_remote_release.outputs.latest_release_tag }}
-          git push origin ${{ steps.get_remote_release.outputs.latest_release_tag }}
+          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }} ${{ steps.get_remote_release.outputs.latest_release_tag }}
 
-      - name: Create Release
+      - name: 创建发布版本
         if: steps.get_remote_release.outputs.skip == 'false' && steps.check_local_release.outputs.exists == 'false'
         uses: actions/create-release@v1
         env:
@@ -106,32 +106,32 @@ jobs:
           prerelease: false
 
       # 构建并推送Docker镜像
-      - name: Set up Docker Buildx
+      - name: 设置 Docker Buildx
         if: steps.get_remote_release.outputs.skip == 'false' && steps.check_local_release.outputs.exists == 'false'
         uses: docker/setup-buildx-action@v3
 
-      - name: Login to DockerHub
+      - name: 登陆 DockerHub
         if: steps.get_remote_release.outputs.skip == 'false' && steps.check_local_release.outputs.exists == 'false'
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Login to GitHub Container Registry
-        if: steps.get_remote_release.outputs.skip == 'false' && steps.check_local_release.outputs.exists == 'false'
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+     #- name: 登录 GitHub 容器仓库
+     #  if: steps.get_remote_release.outputs.skip == 'false' && steps.check_local_release.outputs.exists == 'false'
+     #  uses: docker/login-action@v3
+     #  with:
+     #    registry: ghcr.io
+     #    username: ${{ github.actor }}
+     #    password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Get current date
+      - name: 获取当前日期
         if: steps.get_remote_release.outputs.skip == 'false' && steps.check_local_release.outputs.exists == 'false'
         id: date
         run: echo "date=$(date +'%Y%m%d')" >> $GITHUB_OUTPUT
 
       # 构建并推送Build-Docker镜像
-      - name: Build and push Build-Docker image
+      - name: 构建并推送 Build-Docker 镜像
         if: steps.get_remote_release.outputs.skip == 'false' && steps.check_local_release.outputs.exists == 'false'
         uses: docker/build-push-action@v5
         with:
@@ -146,7 +146,7 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/svnadmin2:${{ steps.date.outputs.date }}
 
       # 构建并推送Build-Docker-kotel镜像
-      - name: Build and push Build-Docker-kotel image
+      - name: 构建并推送 Build-Docker-kotel 镜像
         if: steps.get_remote_release.outputs.skip == 'false' && steps.check_local_release.outputs.exists == 'false'
         uses: docker/build-push-action@v5
         with:
