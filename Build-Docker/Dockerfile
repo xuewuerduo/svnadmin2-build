@@ -43,7 +43,7 @@ RUN set -eux \
     # 配置时区 \
     echo "${TZ}" > /etc/timezone; \
     dnf install -y https://mirrors.aliyun.com/remi/enterprise/remi-release-10.rpm; \
-    echo -e "[WandiscoSVN]\nname=Wandisco SVN Repo\nbaseurl=https://opensource.wandisco.com/centos/9/svn-1.14/RPMS/x86_64/\nenabled=1\ngpgcheck=0" > /etc/yum.repos.d/wandisco-svn.repo; \
+    # echo -e "[WandiscoSVN]\nname=Wandisco SVN Repo\nbaseurl=https://opensource.wandisco.com/centos/9/svn-1.14/RPMS/x86_64/\nenabled=1\ngpgcheck=0" > /etc/yum.repos.d/wandisco-svn.repo; \
     dnf module enable -y php:remi-8.4; \
     sed -e 's|^mirrorlist=|#mirrorlist=|g' \
         -e 's|^#baseurl=http://dl.rockylinux.org/$contentdir|baseurl=https://mirrors.aliyun.com/rockylinux|g' \
