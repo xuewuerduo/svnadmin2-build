@@ -7,7 +7,7 @@ ENV TZ=Asia/Shanghai
 WORKDIR /home
 # 从GitHub拉取项目
 RUN apt-get install -y git; \
-    git clone https://gitee.com/witersen/SvnAdminV2.0.git; \
+    git clone https://github.com/witersen/SvnAdminV2.0.git; \
     npm config set registry https://registry.npmmirror.com;
 
 WORKDIR /home/SvnAdminV2.0
@@ -16,7 +16,7 @@ COPY Build-Docker-kotel/01.web/ 01.web/
 COPY Build-Docker-kotel/02.php/ 02.php/
 
 RUN cd 01.web; \
-    rm -rf package-lock.json; \
+    # rm -rf package-lock.json; \
     npm install; \
     npm run build; \
     # 验证构建结果 \
@@ -38,13 +38,13 @@ COPY --from=builder /home/SvnAdminV2.0/01.web/dist/ /var/www/html/
 # 复制其他应用文件（从第一阶段）
 COPY --from=builder /home/SvnAdminV2.0/02.php /var/www/html/
 COPY --from=builder /home/SvnAdminV2.0/03.cicd/svnadmin_docker/data/ /templete/
-COPY Build-Docker-kotel/favicon.ico /var/www/html/favicon.ico
+COPY favicon.ico /var/www/html/favicon.ico
 
 # 复制启动脚本
-COPY Build-Docker-kotel/Start.sh /home/Start.sh
+COPY Start.sh /home/Start.sh
 
 # 修改SQLite数据库登录不要验证码
-COPY Build-Docker-kotel/svnadmin.db /templete/svnadmin.db
+COPY svnadmin.db /templete/svnadmin.db
 
 # 安装系统依赖和运行环境
 RUN set -eux \

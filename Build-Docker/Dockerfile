@@ -13,7 +13,7 @@ RUN apt-get install -y git; \
 WORKDIR /home/SvnAdminV2.0
 
 RUN cd 01.web; \
-    rm -rf package-lock.json; \
+    # rm -rf package-lock.json; \
     npm install; \
     npm run build; \
     # 验证构建结果 \
