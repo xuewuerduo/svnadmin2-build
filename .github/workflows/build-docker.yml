@@ -23,19 +23,19 @@ jobs:
         run: |
           # 获取远程仓库的所有release列表
           response=$(curl -s https://api.github.com/repos/witersen/SvnAdminV2.0/releases)
-          
-          # 遍历release列表，找到第一个不包含"update"关键词的release
+
+          # 遍历release列表，找到第一个符合纯数字格式的release
           latest_release_tag=""
           latest_release_name=""
           latest_release_body=""
           latest_release_url=""
-          
+
           echo "$response" | jq -c '.[]' | while read -r release; do
             tag_name=$(echo "$release" | jq -r '.tag_name')
             name=$(echo "$release" | jq -r '.name')
-          
-            # 检查版本名称是否包含"update"等英文字段
-            if [[ "$tag_name" != *[Uu][Pp][Dd][Aa][Tt][Ee]* ]] && [[ "$name" != *[Uu][Pp][Dd][Aa][Tt][Ee]* ]]; then
+
+            # 检查版本标签是否符合纯数字格式（例如：v1.2.3 或 1.2.3）
+            if [[ "$tag_name" =~ ^[vV]?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
               latest_release_tag="$tag_name"
               latest_release_name="$name"
               latest_release_body=$(echo "$release" | jq -r '.body')
@@ -43,24 +43,21 @@ jobs:
               break
             fi
           done
-          
-          # 如果没有找到不包含"update"的release，则使用最新的release
+
+          # 如果没有找到符合纯数字格式的release，则跳过
           if [[ -z "$latest_release_tag" ]]; then
-            release=$(echo "$response" | jq -c '.[0]')
-            latest_release_tag=$(echo "$release" | jq -r '.tag_name')
-            latest_release_name=$(echo "$release" | jq -r '.name')
-            latest_release_body=$(echo "$release" | jq -r '.body')
-            latest_release_url=$(echo "$release" | jq -r '.html_url')
-          
-            echo "No release without 'update' keyword found, using latest release"
+            echo "No release with pure numeric version format found, skipping"
+            echo "skip=true" >> $GITHUB_OUTPUT
+            exit 0
           fi
-          
+
           echo "latest_release_tag=$latest_release_tag" >> $GITHUB_OUTPUT
           echo "latest_release_name=$latest_release_name" >> $GITHUB_OUTPUT
           echo "latest_release_body=$latest_release_body" >> $GITHUB_OUTPUT
           echo "latest_release_url=$latest_release_url" >> $GITHUB_OUTPUT
           echo "skip=false" >> $GITHUB_OUTPUT
-
+      
+      
 
       - name: 检查此仓库中是否已存在该发布版本
         if: steps.get_remote_release.outputs.skip == 'false'
