@@ -36,7 +36,7 @@ COPY --from=builder /home/SvnAdminV2.0/01.web/dist/ /var/www/html/
 COPY --from=builder /home/SvnAdminV2.0/02.php /var/www/html/
 COPY --from=builder /home/SvnAdminV2.0/03.cicd/svnadmin_docker/data/ /templete/
 COPY Start.sh /home/Start.sh
-# COPY favicon.ico /var/www/html/favicon.ico
+COPY favicon.ico /var/www/html/
 
 # 安装系统依赖和运行环境
 RUN set -eux \
