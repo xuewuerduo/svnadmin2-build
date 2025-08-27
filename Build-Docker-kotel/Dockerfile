@@ -44,7 +44,7 @@ COPY Build-Docker-kotel/favicon.ico /var/www/html/favicon.ico
 COPY Build-Docker-kotel/Start.sh /home/Start.sh
 
 # 修改SQLite数据库登录不要验证码
-COPY Build-Docker-kotel/svnadmin.db/ /templete/svnadmin.db
+COPY Build-Docker-kotel/svnadmin.db /templete/svnadmin.db
 
 # 安装系统依赖和运行环境
 RUN set -eux \
