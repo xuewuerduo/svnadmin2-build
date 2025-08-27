@@ -7,13 +7,14 @@ ENV TZ=Asia/Shanghai
 WORKDIR /home
 # 从GitHub拉取项目
 RUN apt-get install -y git; \
-    git clone https://github.com/witersen/SvnAdminV2.0.git; \
+    git clone https://gitee.com/witersen/SvnAdminV2.0.git; \
     npm config set registry https://registry.npmmirror.com;
 
 WORKDIR /home/SvnAdminV2.0
 # 复制前端源码并构建
-COPY Build-Docker-kotel/01.web/ 01.web/
-COPY Build-Docker-kotel/02.php/ 02.php/
+RUN ls -la
+COPY 01.web/ 01.web/
+COPY 02.php/ 02.php/
 
 RUN cd 01.web; \
     rm -rf package-lock.json; \
