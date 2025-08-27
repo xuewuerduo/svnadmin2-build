@@ -213,6 +213,8 @@ jobs:
         with:
           context: ./Build-Docker
           platforms: linux/amd64,linux/arm64
+          readme_filepath: ./README.md
+          short-description: "基于web的SVN管理系统，支持HTTP协议、SVN协议、支持LDAP认证、Docker部署"
           push: true
           tags: |
             xuewuerduo/svnadmin2:latest
@@ -222,13 +224,14 @@ jobs:
       #      ghcr.io/${{ github.repository_owner }}/svnadmin2:${{ steps.get_remote_release.outputs.latest_release_tag }}
       #      ghcr.io/${{ github.repository_owner }}/svnadmin2:${{ steps.date.outputs.date }}
 
-      # 构建并推送Build-Docker-kotel镜像
       - name: 构建并推送 Build-Docker-kotel 镜像
         if: steps.get_remote_release.outputs.skip == 'false' && steps.check_local_release.outputs.exists == 'false'
         uses: docker/build-push-action@v5
         with:
           context: ./Build-Docker-kotel
           platforms: linux/amd64,linux/arm64
+          readme_filepath: ./README.md
+          short-description: "基于web的SVN管理系统，支持HTTP协议、SVN协议、支持LDAP认证、Docker部署"
           push: true
           tags: |
             xuewuerduo/svnadmin2-kotel:latest
