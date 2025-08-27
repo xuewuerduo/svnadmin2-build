@@ -48,7 +48,7 @@ jobs:
             if [[ "$tag_name" =~ ^[vV]?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
               latest_release_tag="$tag_name"
               latest_release_name="$name"
-              latest_release_body=$(echo "$release_json" | jq -r '.body')
+              latest_release_body=$(echo "$release_json" | jq -r '.body' | sed ':a;N;$!ba;s/\n/\\n/g' | sed 's/[、，]/,/g')
               latest_release_url=$(echo "$release_json" | jq -r '.html_url')
               echo "Found matching release: $tag_name"
               break
@@ -62,9 +62,12 @@ jobs:
             exit 0
           fi
 
+          # 对输出进行转义处理，防止特殊字符破坏格式
           echo "latest_release_tag=$latest_release_tag" >> $GITHUB_OUTPUT
           echo "latest_release_name=$latest_release_name" >> $GITHUB_OUTPUT
-          echo "latest_release_body=$latest_release_body" >> $GITHUB_OUTPUT
+          echo "latest_release_body<<EOF" >> $GITHUB_OUTPUT
+          echo "$latest_release_body" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
           echo "latest_release_url=$latest_release_url" >> $GITHUB_OUTPUT
           echo "skip=false" >> $GITHUB_OUTPUT
 
