@@ -7,7 +7,8 @@ ENV TZ=Asia/Shanghai
 WORKDIR /home
 # 从GitHub拉取项目
 RUN apt-get install -y git; \
-    git clone https://github.com/witersen/SvnAdminV2.0.git; \
+    git clone https://github.com/witersen/SvnAdminV2.0.git;
+
     # npm config set registry https://registry.npmmirror.com;
 
 WORKDIR /home/SvnAdminV2.0
