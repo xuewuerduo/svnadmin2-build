@@ -213,7 +213,7 @@ jobs:
         with:
           context: ./Build-Docker
           platforms: linux/amd64,linux/arm64
-          readme_filepath: ./README.md
+          readme-filepath: ./README.md
           short-description: "基于web的SVN管理系统，支持HTTP协议、SVN协议、支持LDAP认证、Docker部署"
           push: true
           tags: |
@@ -230,7 +230,7 @@ jobs:
         with:
           context: ./Build-Docker-kotel
           platforms: linux/amd64,linux/arm64
-          readme_filepath: ./README.md
+          readme-filepath: ./README.md
           short-description: "基于web的SVN管理系统，支持HTTP协议、SVN协议、支持LDAP认证、Docker部署"
           push: true
           tags: |
