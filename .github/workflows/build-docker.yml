@@ -34,6 +34,7 @@ jobs:
           latest_release_name=""
           latest_release_body=""
           latest_release_url=""
+          latest_release_id=""
 
           # 使用数组方式避免管道问题
           mapfile -t releases < <(echo "$response" | jq -c '.[]')
@@ -50,6 +51,7 @@ jobs:
               latest_release_name="$name"
               latest_release_body=$(echo "$release_json" | jq -r '.body' | sed ':a;N;$!ba;s/\n/\\n/g' | sed 's/[、，]/,/g')
               latest_release_url=$(echo "$release_json" | jq -r '.html_url')
+              latest_release_id=$(echo "$release_json" | jq -r '.id')
               echo "Found matching release: $tag_name"
               break
             fi
@@ -62,6 +64,15 @@ jobs:
             exit 0
           fi
 
+          # 获取release的资源文件信息
+          assets_response=$(curl -s "https://api.github.com/repos/witersen/SvnAdminV2.0/releases/$latest_release_id/assets")
+          echo "Release assets count: $(echo "$assets_response" | jq 'length')"
+          
+          # 保存资源文件信息到输出
+          echo "assets_json<<EOF" >> $GITHUB_OUTPUT
+          echo "$assets_response" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
           # 对输出进行转义处理，防止特殊字符破坏格式
           echo "latest_release_tag=$latest_release_tag" >> $GITHUB_OUTPUT
           echo "latest_release_name=$latest_release_name" >> $GITHUB_OUTPUT
@@ -69,6 +80,7 @@ jobs:
           echo "$latest_release_body" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
           echo "latest_release_url=$latest_release_url" >> $GITHUB_OUTPUT
+          echo "latest_release_id=$latest_release_id" >> $GITHUB_OUTPUT
           echo "skip=false" >> $GITHUB_OUTPUT
 
 
@@ -86,6 +98,35 @@ jobs:
             echo "exists=false" >> $GITHUB_OUTPUT
           fi
 
+      - name: 下载远程仓库的Release资源文件
+        if: steps.get_remote_release.outputs.skip == 'false' && steps.check_local_release.outputs.exists == 'false'
+        id: download_assets
+        run: |
+          # 创建临时目录存放下载的资源文件
+          mkdir -p /tmp/release_assets
+          cd /tmp/release_assets
+          
+          # 从步骤输出中读取资源文件信息
+          assets_json=$(echo "${{ steps.get_remote_release.outputs.assets_json }}" | jq -c '.[]')
+          
+          # 遍历并下载所有资源文件
+          echo "$assets_json" | while read -r asset; do
+            asset_name=$(echo "$asset" | jq -r '.name')
+            asset_url=$(echo "$asset" | jq -r '.browser_download_url')
+          
+            if [[ "$asset_name" != "null" && "$asset_url" != "null" ]]; then
+              echo "Downloading asset: $asset_name"
+              curl -L -o "$asset_name" "$asset_url"
+            fi
+          done
+          
+          # 列出下载的文件
+          echo "Downloaded assets:"
+          ls -la
+          
+          # 设置标志表示已下载资源文件
+          echo "downloaded=true" >> $GITHUB_OUTPUT
+
       - name: 创建新标签并发布（版本）
         if: steps.get_remote_release.outputs.skip == 'false' && steps.check_local_release.outputs.exists == 'false'
         run: |
@@ -100,6 +141,7 @@ jobs:
       - name: 创建发布版本
         if: steps.get_remote_release.outputs.skip == 'false' && steps.check_local_release.outputs.exists == 'false'
         uses: actions/create-release@v1
+        id: create_release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -116,6 +158,27 @@ jobs:
           draft: false
           prerelease: false
 
+      - name: 上传资源文件到新创建的Release
+        if: steps.get_remote_release.outputs.skip == 'false' && steps.check_local_release.outputs.exists == 'false' && steps.download_assets.outputs.downloaded == 'true'
+        run: |
+          # 上传下载的资源文件到新创建的release
+          cd /tmp/release_assets
+          
+          # 获取新创建的release的上传URL
+          release_id=${{ steps.create_release.outputs.id }}
+          
+          # 遍历并上传所有资源文件
+          for file in *; do
+            if [[ -f "$file" ]]; then
+              echo "Uploading asset: $file"
+              curl -X POST \
+                -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+                -H "Content-Type: application/octet-stream" \
+                --data-binary @"$file" \
+                "https://uploads.github.com/repos/${{ github.repository }}/releases/$release_id/assets?name=$(basename "$file")"
+            fi
+          done
+
       # 构建并推送Docker镜像
       - name: 设置 Docker Buildx
         if: steps.get_remote_release.outputs.skip == 'false' && steps.check_local_release.outputs.exists == 'false'
@@ -128,13 +191,6 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      #- name: 登录 GitHub 容器仓库
-      #  if: steps.get_remote_release.outputs.skip == 'false' && steps.check_local_release.outputs.exists == 'false'
-      #  uses: docker/login-action@v3
-      #  with:
-      #    registry: ghcr.io
-      #    username: ${{ github.actor }}
-      #    password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: 获取当前日期
         if: steps.get_remote_release.outputs.skip == 'false' && steps.check_local_release.outputs.exists == 'false'
@@ -152,9 +208,9 @@ jobs:
             xuewuerduo/svnadmin2:latest
             xuewuerduo/svnadmin2:${{ steps.get_remote_release.outputs.latest_release_tag }}
             xuewuerduo/svnadmin2:${{ steps.date.outputs.date }}
-            ghcr.io/${{ github.repository_owner }}/svnadmin2:latest
-            ghcr.io/${{ github.repository_owner }}/svnadmin2:${{ steps.get_remote_release.outputs.latest_release_tag }}
-            ghcr.io/${{ github.repository_owner }}/svnadmin2:${{ steps.date.outputs.date }}
+          # ghcr.io/${{ github.repository_owner }}/svnadmin2:latest
+          # ghcr.io/${{ github.repository_owner }}/svnadmin2:${{ steps.get_remote_release.outputs.latest_release_tag }}
+          # ghcr.io/${{ github.repository_owner }}/svnadmin2:${{ steps.date.outputs.date }}
 
       # 构建并推送Build-Docker-kotel镜像
       - name: 构建并推送 Build-Docker-kotel 镜像
@@ -167,6 +223,6 @@ jobs:
             xuewuerduo/svnadmin2-kotel:latest
             xuewuerduo/svnadmin2-kotel:${{ steps.get_remote_release.outputs.latest_release_tag }}
             xuewuerduo/svnadmin2-kotel:${{ steps.date.outputs.date }}
-            ghcr.io/${{ github.repository_owner }}/svnadmin2-kotel:latest
-            ghcr.io/${{ github.repository_owner }}/svnadmin2-kotel:${{ steps.get_remote_release.outputs.latest_release_tag }}
-            ghcr.io/${{ github.repository_owner }}/svnadmin2-kotel:${{ steps.date.outputs.date }}
+         # ghcr.io/${{ github.repository_owner }}/svnadmin2-kotel:latest
+         # ghcr.io/${{ github.repository_owner }}/svnadmin2-kotel:${{ steps.get_remote_release.outputs.latest_release_tag }}
+         # ghcr.io/${{ github.repository_owner }}/svnadmin2-kotel:${{ steps.date.outputs.date }}
