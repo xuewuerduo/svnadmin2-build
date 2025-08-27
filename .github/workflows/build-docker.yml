@@ -212,6 +212,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ./Build-Docker
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: |
             xuewuerduo/svnadmin2:latest
@@ -227,6 +228,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ./Build-Docker-kotel
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: |
             xuewuerduo/svnadmin2-kotel:latest
