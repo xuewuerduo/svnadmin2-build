@@ -1,4 +1,3 @@
-
 name: 检查远程发布并使用 Docker 镜像创建发布版本
 
 on:
@@ -21,7 +20,8 @@ jobs:
 
       - name: 从远程仓库获取最新发布版本
         id: get_remote_release
-        run: |          # 获取远程仓库的所有release列表
+        run: |
+          # 获取远程仓库的所有release列表
           response=$(curl -s https://api.github.com/repos/witersen/SvnAdminV2.0/releases)
           
           # 调试信息：输出获取到的release信息
@@ -84,21 +84,10 @@ jobs:
           echo "latest_release_id=$latest_release_id" >> $GITHUB_OUTPUT
           echo "skip=false" >> $GITHUB_OUTPUT
 
-      - name: 检查此仓库中是否已存在该发布版本
-        if: steps.get_remote_release.outputs.skip == 'false'
-        id: check_local_release
-        run: |          # 检查本地是否已有该标签
-          if git rev-parse -q --verify "refs/tags/${{ steps.get_remote_release.outputs.latest_release_tag }}" >/dev/null; then
-            echo "Release already exists in local repository"
-            echo "exists=true" >> $GITHUB_OUTPUT
-          else
-            echo "Release does not exist in local repository"
-            echo "exists=false" >> $GITHUB_OUTPUT
-          fi
-
       - name: 下载 SvnAdminV2.0 源码并打包
         if: steps.get_remote_release.outputs.skip == 'false' && steps.check_local_release.outputs.exists == 'false'
-        run: |          # 创建源码目录
+        run: |
+          # 创建源码目录
           mkdir -p repos
           
           # 克隆 SvnAdminV2.0 仓库
@@ -110,26 +99,37 @@ jobs:
           
           # 创建需要打包的目录结构
           cd ../..
-          mkdir -p svnadmin-code/{01.web,02.php,03.template}
+          mkdir -p svnadmin-code/{01.web,02.php,03.cicd/svnadmin_docker}
           
           # 复制需要的目录
           cp -r repos/SvnAdminV2.0/01.web/* svnadmin-code/01.web/
           cp -r repos/SvnAdminV2.0/02.php/* svnadmin-code/02.php/
-          cp -r repos/SvnAdminV2.0/03.cicd/svnadmin_docker/data 03.template/
+          cp -r repos/SvnAdminV2.0/03.cicd/svnadmin_docker/data svnadmin-code/03.cicd/svnadmin_docker/
           
           # 打包需要的文件
           tar -czf SvnAdminV2.0-${{ steps.get_remote_release.outputs.latest_release_tag }}.tar.gz svnadmin-code
           
           # 清理临时目录
           rm -rf repos svnadmin-code
-          
-          echo 2222
-          ls -la
+
+      - name: 检查此仓库中是否已存在该发布版本
+        if: steps.get_remote_release.outputs.skip == 'false'
+        id: check_local_release
+        run: |
+          # 检查本地是否已有该标签
+          if git rev-parse -q --verify "refs/tags/${{ steps.get_remote_release.outputs.latest_release_tag }}" >/dev/null; then
+            echo "Release already exists in local repository"
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "Release does not exist in local repository"
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: 下载远程仓库的Release资源文件
         if: steps.get_remote_release.outputs.skip == 'false' && steps.check_local_release.outputs.exists == 'false'
         id: download_assets
-        run: |          # 创建临时目录存放下载的资源文件
+        run: |
+          # 创建临时目录存放下载的资源文件
           mkdir -p /tmp/release_assets
           cd /tmp/release_assets
           
@@ -156,7 +156,8 @@ jobs:
 
       - name: 创建新标签并发布（版本）
         if: steps.get_remote_release.outputs.skip == 'false' && steps.check_local_release.outputs.exists == 'false'
-        run: |          # 配置git
+        run: |
+          # 配置git
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           
@@ -177,7 +178,8 @@ jobs:
         with:
           tag_name: ${{ steps.get_remote_release.outputs.latest_release_tag }}
           release_name: ${{ steps.get_remote_release.outputs.latest_release_name }}
-          body: |            同步自 [witersen/SvnAdminV2.0](${{ steps.get_remote_release.outputs.latest_release_url }}) 的更新:
+          body: |
+            同步自 [witersen/SvnAdminV2.0](${{ steps.get_remote_release.outputs.latest_release_url }}) 的更新:
             
             ${{ steps.get_remote_release.outputs.latest_release_body }}
             
@@ -189,7 +191,8 @@ jobs:
 
       - name: 上传资源文件到新创建的Release
         if: steps.get_remote_release.outputs.skip == 'false' && steps.check_local_release.outputs.exists == 'false' && steps.download_assets.outputs.downloaded == 'true'
-        run: |          # 上传下载的资源文件到新创建的release
+        run: |
+          # 上传下载的资源文件到新创建的release
           cd /tmp/release_assets
           
           # 获取新创建的release的上传URL
@@ -210,7 +213,8 @@ jobs:
 
       - name: 上传源码包到新创建的Release
         if: steps.get_remote_release.outputs.skip == 'false' && steps.check_local_release.outputs.exists == 'false'
-        run: |          # 上传源码包到新创建的release
+        run: |
+          # 上传源码包到新创建的release
           release_id=${{ steps.create_release.outputs.id }}
           
           echo "Uploading source code package: SvnAdminV2.0-${{ steps.get_remote_release.outputs.latest_release_tag }}.tar.gz"
@@ -254,7 +258,8 @@ jobs:
           context: ./Build-Docker
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: |            xuewuerduo/svnadmin2:latest
+          tags: |
+            xuewuerduo/svnadmin2:latest
             xuewuerduo/svnadmin2:${{ steps.get_remote_release.outputs.latest_release_tag }}
             xuewuerduo/svnadmin2:${{ steps.date.outputs.date }}
       #      ghcr.io/${{ github.repository_owner }}/svnadmin2:latest
@@ -277,7 +282,8 @@ jobs:
           context: ./Build-Docker-kotel
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: |            xuewuerduo/svnadmin2-kotel:latest
+          tags: |
+            xuewuerduo/svnadmin2-kotel:latest
             xuewuerduo/svnadmin2-kotel:${{ steps.get_remote_release.outputs.latest_release_tag }}
             xuewuerduo/svnadmin2-kotel:${{ steps.date.outputs.date }}
       #      ghcr.io/${{ github.repository_owner }}/svnadmin2-kotel:latest
