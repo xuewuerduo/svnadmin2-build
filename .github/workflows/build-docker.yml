@@ -84,6 +84,19 @@ jobs:
           echo "latest_release_id=$latest_release_id" >> $GITHUB_OUTPUT
           echo "skip=false" >> $GITHUB_OUTPUT
 
+      - name: 检查此仓库中是否已存在该发布版本
+        if: steps.get_remote_release.outputs.skip == 'false'
+        id: check_local_release
+        run: |
+          # 检查本地是否已有该标签
+          if git rev-parse -q --verify "refs/tags/${{ steps.get_remote_release.outputs.latest_release_tag }}" >/dev/null; then
+            echo "Release already exists in local repository"
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "Release does not exist in local repository"
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: 下载 SvnAdminV2.0 源码并打包
         if: steps.get_remote_release.outputs.skip == 'false' && steps.check_local_release.outputs.exists == 'false'
         run: |
@@ -111,19 +124,6 @@ jobs:
           
           # 清理临时目录
           rm -rf repos svnadmin-code
-
-      - name: 检查此仓库中是否已存在该发布版本
-        if: steps.get_remote_release.outputs.skip == 'false'
-        id: check_local_release
-        run: |
-          # 检查本地是否已有该标签
-          if git rev-parse -q --verify "refs/tags/${{ steps.get_remote_release.outputs.latest_release_tag }}" >/dev/null; then
-            echo "Release already exists in local repository"
-            echo "exists=true" >> $GITHUB_OUTPUT
-          else
-            echo "Release does not exist in local repository"
-            echo "exists=false" >> $GITHUB_OUTPUT
-          fi
 
       - name: 下载远程仓库的Release资源文件
         if: steps.get_remote_release.outputs.skip == 'false' && steps.check_local_release.outputs.exists == 'false'
