@@ -99,18 +99,21 @@ jobs:
           
           # 创建需要打包的目录结构
           cd ../..
-          mkdir -p svnadmin-code/{01.web,02.php,03.cicd/svnadmin_docker}
+          mkdir -p svnadmin-code/{01.web,02.php,03.template}
           
           # 复制需要的目录
           cp -r repos/SvnAdminV2.0/01.web/* svnadmin-code/01.web/
           cp -r repos/SvnAdminV2.0/02.php/* svnadmin-code/02.php/
-          cp -r repos/SvnAdminV2.0/03.cicd/svnadmin_docker/data svnadmin-code/03.cicd/svnadmin_docker/
+          cp -r repos/SvnAdminV2.0/03.cicd/svnadmin_docker/data 03.template/
           
           # 打包需要的文件
           tar -czf SvnAdminV2.0-${{ steps.get_remote_release.outputs.latest_release_tag }}.tar.gz svnadmin-code
           
           # 清理临时目录
           rm -rf repos svnadmin-code
+          
+          echo 2222
+          ls -la
 
       - name: 检查此仓库中是否已存在该发布版本
         if: steps.get_remote_release.outputs.skip == 'false'
