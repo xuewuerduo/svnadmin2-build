@@ -84,7 +84,33 @@ jobs:
           echo "latest_release_id=$latest_release_id" >> $GITHUB_OUTPUT
           echo "skip=false" >> $GITHUB_OUTPUT
 
-
+      - name: 下载 SvnAdminV2.0 源码并打包
+        if: steps.get_remote_release.outputs.skip == 'false' && steps.check_local_release.outputs.exists == 'false'
+        run: |
+          # 创建源码目录
+          mkdir -p repos
+          
+          # 克隆 SvnAdminV2.0 仓库
+          git clone https://github.com/witersen/SvnAdminV2.0.git repos/SvnAdminV2.0
+          
+          # 切换到对应的发布版本
+          cd repos/SvnAdminV2.0
+          git checkout tags/${{ steps.get_remote_release.outputs.latest_release_tag }}
+          
+          # 创建需要打包的目录结构
+          cd ../..
+          mkdir -p svnadmin-code/{01.web,02.php,03.cicd/svnadmin_docker}
+          
+          # 复制需要的目录
+          cp -r repos/SvnAdminV2.0/01.web/* svnadmin-code/01.web/
+          cp -r repos/SvnAdminV2.0/02.php/* svnadmin-code/02.php/
+          cp -r repos/SvnAdminV2.0/03.cicd/svnadmin_docker/data svnadmin-code/03.cicd/svnadmin_docker/
+          
+          # 打包需要的文件
+          tar -czf SvnAdminV2.0-${{ steps.get_remote_release.outputs.latest_release_tag }}.tar.gz svnadmin-code
+          
+          # 清理临时目录
+          rm -rf repos svnadmin-code
 
       - name: 检查此仓库中是否已存在该发布版本
         if: steps.get_remote_release.outputs.skip == 'false'
@@ -135,6 +161,10 @@ jobs:
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           
+          # 添加源码包到git
+          git add SvnAdminV2.0-${{ steps.get_remote_release.outputs.latest_release_tag }}.tar.gz
+          git commit -m "Add SvnAdminV2.0 source code for ${{ steps.get_remote_release.outputs.latest_release_tag }}"
+          
           # 创建标签
           git tag ${{ steps.get_remote_release.outputs.latest_release_tag }}
           git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }} ${{ steps.get_remote_release.outputs.latest_release_tag }}
@@ -180,6 +210,20 @@ jobs:
                 || echo "Failed to upload $file"
             fi
           done
+
+      - name: 上传源码包到新创建的Release
+        if: steps.get_remote_release.outputs.skip == 'false' && steps.check_local_release.outputs.exists == 'false'
+        run: |
+          # 上传源码包到新创建的release
+          release_id=${{ steps.create_release.outputs.id }}
+          
+          echo "Uploading source code package: SvnAdminV2.0-${{ steps.get_remote_release.outputs.latest_release_tag }}.tar.gz"
+          curl -X POST \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Content-Type: application/octet-stream" \
+            --data-binary @SvnAdminV2.0-${{ steps.get_remote_release.outputs.latest_release_tag }}.tar.gz \
+            "https://uploads.github.com/repos/${{ github.repository }}/releases/$release_id/assets?name=SvnAdminV2.0-${{ steps.get_remote_release.outputs.latest_release_tag }}.tar.gz" \
+            || echo "Failed to upload source code package"
 
       # 构建并推送Docker镜像
       - name: 设置 Docker Buildx
