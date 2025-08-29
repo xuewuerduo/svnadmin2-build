@@ -273,7 +273,7 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
           repository: xuewuerduo/svnadmin2
           short-description: "基于web的SVN管理系统，支持HTTP协议、SVN协议、支持LDAP认证、Docker部署"
-          readme-filepath: README.md
+          readme-filepath: Build-Docker/README.md
 
       - name: 构建并推送 Build-Docker-kotel 镜像
         if: steps.get_remote_release.outputs.skip == 'false' && steps.check_local_release.outputs.exists == 'false'
@@ -297,7 +297,7 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
           repository: xuewuerduo/svnadmin2-kotel
           short-description: "基于大佬的镜像进行了一些小调整，具体看介绍"
-          readme-filepath: README.md
+          readme-filepath: Build-Docker-kotel/README.md
 
   # 新增job: 创建符合要求的源代码发布包
   create-source-code-release:
