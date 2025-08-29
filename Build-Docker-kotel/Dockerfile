@@ -24,7 +24,7 @@ RUN cd 01.web; \
     if [ ! -d "dist" ]; then echo "构建失败"; exit 1; fi;
 
 # 第二阶段：最终运行环境阶段
-FROM rockylinux/rockylinux:10
+FROM rockylinux/rockylinux:9
 
 # LABEL MAINTAINER = "www.witersen.com 2023-07-23"
 
