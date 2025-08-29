@@ -364,7 +364,7 @@ jobs:
           ls -la "修改版-Source Code.tar.gz"
 
       - name: 上传源代码包到 GitHub Actions Artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: source-code-packages
           path: |
