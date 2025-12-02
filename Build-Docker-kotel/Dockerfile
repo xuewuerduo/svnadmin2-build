@@ -1,116 +1,104 @@
-# 第一阶段：前端构建阶段
-FROM node:18.20.8-bookworm AS builder
+#!/bin/bash
 
-# 配置环境变量
-ENV TZ=Asia/Shanghai
+# 保存当前的set选项
+current_set=$(set +o)
+# 关闭未定义变量检查
+set +u
+# 加载环境变量k
+. /etc/profile
+# 恢复之前的set选项
+eval "$current_set"
+# 定义常量变量，提高可维护性
+SVNADMIN_DIR="/home/svnadmin"
+TEMPLETE_DIR="/templete"
+RUN_HTTPD_DIR="/run/httpd"
 
-WORKDIR /home
-# 从GitHub拉取项目
-RUN apt-get install -y git; \
-    git clone https://github.com/witersen/SvnAdminV2.0.git;
-    # npm config set registry https://registry.npmmirror.com;
+# 加载环境变量
+. /etc/profile
 
-WORKDIR /home/SvnAdminV2.0
-# 复制前端源码并构建
-RUN ls -la
-COPY 01.web/ 01.web/
-COPY 02.php/ 02.php/
+# 函数：打印信息
+info() {
+    echo "[$(date +'%Y-%m-%d %H:%M:%S')] INFO: $1"
+}
 
-RUN cd 01.web; \
-    rm -rf package-lock.json; \
-    npm install; \
-    npm run build; \
-    # 验证构建结果 \
-    if [ ! -d "dist" ]; then echo "构建失败"; exit 1; fi;
+# 函数：打印错误并退出
+error_exit() {
+    echo "[$(date +'%Y-%m-%d %H:%M:%S')] ERROR: $1" >&2
+    exit 1
+}
 
-# 第二阶段：最终运行环境阶段
-FROM rockylinux/rockylinux:9
+# 检查并初始化目录结构
+info "检查目录结构..."
+if [ -z "$(ls -A "$SVNADMIN_DIR" 2>/dev/null)" ]; then
+    info "检测到$SVNADMIN_DIR目录为空，正在从$TEMPLETE_DIR复制文件..."
 
-# LABEL MAINTAINER = "www.witersen.com 2023-07-23"
+    # 创建目录结构（--parents确保父目录存在）
+    mkdir -p \
+        "$SVNADMIN_DIR"/{backup,crond,rep,temp,logs,templete/initStruct/01/{branches,tags,trunk}} \
+        "$SVNADMIN_DIR/sasl/ldap" \
+        || error_exit "创建目录结构失败"
 
-# 配置环境变量
-ENV TZ=Asia/Shanghai \
-    LANG=C.UTF-8 \
-    LC_ALL=C.UTF-8
+    # 复制模板文件
+    cp -r "$TEMPLETE_DIR"/* "$SVNADMIN_DIR/" || error_exit "复制模板文件失败"
 
-# 复制前端构建产物（从第一阶段）
-COPY --from=builder /home/SvnAdminV2.0/01.web/dist/ /var/www/html/
+else
+    info "$SVNADMIN_DIR目录不为空，跳过文件复制"
+fi
 
-# 复制其他应用文件（从第一阶段）
-COPY --from=builder /home/SvnAdminV2.0/02.php /var/www/html/
-COPY --from=builder /home/SvnAdminV2.0/03.cicd/svnadmin_docker/data/ /templete/
-COPY favicon.ico /var/www/html/favicon.ico
+# 设置权限（合并操作，减少重复执行）
+info "设置目录权限..."
+chown -R apache:apache \
+    "$SVNADMIN_DIR" \
+    || error_exit "设置权限失败"
 
-# 复制启动脚本
-COPY Start.sh /home/Start.sh
+# 启动PHP-FPM
+info "启动php-fpm..."
+/usr/sbin/php-fpm || error_exit "php-fpm启动失败"
 
-# 修改SQLite数据库登录不要验证码
-COPY svnadmin.db /templete/svnadmin.db
+# 启动SVN服务
+info "启动svnserve..."
+/usr/bin/svnserve --daemon \
+    --pid-file="$SVNADMIN_DIR/svnserve.pid" \
+    -r "$SVNADMIN_DIR/rep/" \
+    --config-file "$SVNADMIN_DIR/svnserve.conf" \
+    --log-file "$SVNADMIN_DIR/logs/svnserve.log" \
+    --listen-port 3690 \
+    --listen-host 0.0.0.0 \
+    || error_exit "svnserve启动失败"
 
-# 安装系统依赖和运行环境
-RUN set -eux \
-    # 配置时区 \
-    echo "${TZ}" > /etc/timezone; \
-    dnf install -y https://rpms.remirepo.net/enterprise/remi-release-9.rpm; \
-    # dnf install -y https://mirrors.aliyun.com/remi/enterprise/remi-release-10.rpm; \
-    # echo -e "[WandiscoSVN]\nname=Wandisco SVN Repo\nbaseurl=https://opensource.wandisco.com/centos/9/svn-1.14/RPMS/x86_64/\nenabled=1\ngpgcheck=0" > /etc/yum.repos.d/wandisco-svn.repo; \
-    dnf module enable -y php:remi-8.4; \
-    # ed -e 's|^mirrorlist=|#mirrorlist=|g' \
-    #    -e 's|^#baseurl=http://dl.rockylinux.org/$contentdir|baseurl=https://mirrors.aliyun.com/rockylinux|g' \
-    #    -i.bak \
-    #    /etc/yum.repos.d/rocky*.repo; \
-    # 安装运行时依赖 \
-    dnf install -y  \
-        --setopt=install_weak_deps=False --nodocs \
-        httpd \
-        mod_dav_svn \
-        mod_ldap \
-        subversion \
-        subversion-tools \
-        php \
-        php-common \
-        php-cli \
-        php-fpm \
-        php-json \
-        php-mysqlnd \
-        php-pdo \
-        php-process \
-        php-gd \
-        php-bcmath \
-        php-ldap \
-        php-mbstring \
-        cyrus-sasl \
-        cyrus-sasl-lib \
-        cyrus-sasl-plain \
-        cronie \
-        at \
-        procps; \
-    # 清理安装缓存 \
-    rm -rf /var/cache/dnf; \
-    dnf autoremove -y; \
-    dnf clean all; \
-    rm -rf \
-            /var/cache/dnf \
-            /etc/yum.repos.d/rocky*.repo.bak \
-            /opt /mnt /usr/games /usr/share/man /usr/share/doc \
-            /tmp/* /var/tmp/*; \
-    # 解决启动时的域名警告问题 \
-    echo "ServerName localhost" >> /etc/httpd/conf/httpd.conf; \
-    mkdir -p /run/php-fpm/; \
-    # PHP安全配置 \
-    sed -i 's/expose_php = On/expose_php = Off/g' /etc/php.ini; \
-    sed -i 's/listen.acl_users = apache,nginx/listen.acl_users = apache/g' /etc/php-fpm.d/www.conf; \
-    chown -R apache:apache /var/www/html; \
-    # 赋予启动脚本执行权限 \
-    chmod +x /home/Start.sh
+# 启动SASL认证服务
+info "启动saslauthd..."
+spid=$(uuidgen)
+/usr/sbin/saslauthd -a 'ldap' \
+    -O "$spid" \
+    -O "$SVNADMIN_DIR/sasl/ldap/saslauthd.conf" \
+    || error_exit "saslauthd启动失败"
 
-# USER apache
-WORKDIR /home/svnadmin
+# 获取saslauthd进程PID（优化命令链，减少管道使用）
+sasl_pid=$(ps aux | grep -v grep | grep -m 1 "$spid" | awk '{print $2}')
+if [ -z "$sasl_pid" ]; then
+    error_exit "无法获取saslauthd进程PID"
+fi
+echo "$sasl_pid" > "$SVNADMIN_DIR/sasl/saslauthd.pid"
+chmod 644 "$SVNADMIN_DIR/sasl/saslauthd.pid"  # 使用更安全的权限，而非777
 
-# 暴露服务端口
-EXPOSE 80
-EXPOSE 443
-EXPOSE 3690
+# 启动定时任务服务
+info "启动crond和atd..."
+/usr/sbin/crond || error_exit "crond启动失败"
+/usr/sbin/atd || error_exit "atd启动失败"
 
-# 启动服务
-CMD ["/home/Start.sh"]
+# 启动svnadmind后台服务
+info "启动svnadmind服务..."
+/usr/bin/php /var/www/html/server/svnadmind.php start &
+svnadmind_pid=$!
+
+# 启动HTTP服务（优化目录处理，避免不必要的删除）
+info "启动httpd..."
+mkdir -p "$RUN_HTTPD_DIR"
+    chown -R apache:apache "$RUN_HTTPD_DIR"
+/usr/sbin/httpd || error_exit "httpd启动失败"
+
+info "所有服务启动完成，进入监控模式..."
+
+# 监控子进程，确保容器持续运行且能感知子进程退出
+wait "$svnadmind_pid"  # 等待后台启动的svnadmind进程
