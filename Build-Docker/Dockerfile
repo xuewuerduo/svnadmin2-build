@@ -101,7 +101,6 @@ RUN set -eux \
     dnf clean all; \
     rm -rf \
             /var/cache/dnf \
-            /etc/yum.repos.d/rocky*.repo.bak \
             /opt /mnt /usr/games /usr/share/man /usr/share/doc \
             /tmp/* /var/tmp/*; \
     # 解决启动时的域名警告问题 \
@@ -112,7 +111,7 @@ RUN set -eux \
     sed -i 's/listen.acl_users = apache,nginx/listen.acl_users = apache/g' /etc/php-fpm.d/www.conf; \
     chown -R apache:apache /var/www/html; \
     # 赋予启动脚本执行权限 \
-    chmod +x /home/Start.sh
+    chmod +x /home/Start.sh \
 
 # USER apache
 WORKDIR /home/svnadmin
