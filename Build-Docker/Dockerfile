@@ -46,12 +46,11 @@ RUN set -eux \
     dnf install -y https://rpms.remirepo.net/enterprise/remi-release-9.rpm; \
     # dnf install -y https://mirrors.aliyun.com/remi/enterprise/remi-release-10.rpm; \
     # echo -e "[WandiscoSVN]\nname=Wandisco SVN Repo\nbaseurl=https://opensource.wandisco.com/centos/9/svn-1.14/RPMS/x86_64/\nenabled=1\ngpgcheck=0" > /etc/yum.repos.d/wandisco-svn.repo; \
-    dnf module enable -y php:remi-8.4; \
+    dnf module enable -y php:remi-8.2; \
     # ed -e 's|^mirrorlist=|#mirrorlist=|g' \
     #    -e 's|^#baseurl=http://dl.rockylinux.org/$contentdir|baseurl=https://mirrors.aliyun.com/rockylinux|g' \
     #    -i.bak \
     #    /etc/yum.repos.d/rocky*.repo; \
-    # 安装运行时依赖 \
     # 安装运行时依赖 \
     dnf install -y  \
         --setopt=install_weak_deps=False --nodocs \
