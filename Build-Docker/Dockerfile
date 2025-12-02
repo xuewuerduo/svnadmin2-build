@@ -20,7 +20,7 @@ RUN cd 01.web; \
     if [ ! -d "dist" ]; then echo "构建失败"; exit 1; fi;
 
 # 第二阶段：最终运行环境阶段
-FROM rockylinux/rockylinux:10
+FROM rockylinux/rockylinux:9
 
 LABEL MAINTAINER = "www.witersen.com 2023-07-23"
 
@@ -42,13 +42,8 @@ COPY favicon.ico /var/www/html/
 RUN set -eux \
     # 配置时区 \
     echo "${TZ}" > /etc/timezone; \
-    dnf install -y https://mirrors.aliyun.com/remi/enterprise/remi-release-10.rpm; \
-    echo -e "[WandiscoSVN]\nname=Wandisco SVN Repo\nbaseurl=https://opensource.wandisco.com/centos/9/svn-1.14/RPMS/x86_64/\nenabled=1\ngpgcheck=0" > /etc/yum.repos.d/wandisco-svn.repo; \
-    dnf module enable -y php:remi-8.4; \
-    sed -e 's|^mirrorlist=|#mirrorlist=|g' \
-        -e 's|^#baseurl=http://dl.rockylinux.org/$contentdir|baseurl=https://mirrors.aliyun.com/rockylinux|g' \
-        -i.bak \
-        /etc/yum.repos.d/rocky*.repo; \
+    dnf install -y https://rpms.remirepo.net/enterprise/remi-release-9.rpm; \
+    dnf module enable -y php:remi-8.2; \
     # 安装运行时依赖 \
     dnf install -y  \
         --setopt=install_weak_deps=False --nodocs \
@@ -74,14 +69,31 @@ RUN set -eux \
         cyrus-sasl-plain \
         cronie \
         at \
+        glibc-langpack-en \
+        glibc-langpack-zh \
+        glibc-all-langpacks \
+        glibc-locale-source \
+        langpacks-zh_CN \
         procps; \
+    # 创建字符映射文(解决UTF-8找不到的问题)\
+    if [ ! -f /usr/share/i18n/charmaps/UTF-8 ]; then \
+        if [ -f /usr/share/i18n/charmaps/UTF-8.gz ]; then \
+            gunzip -c /usr/share/i18n/charmaps/UTF-8.gz > /usr/share/i18n/charmaps/UTF-8; \
+        else \
+            echo "UTF-8 charmap not found, creating from locale source"; \
+            localedef --list-archive | grep UTF-8 || localedef -i en_US -f UTF-8 en_US.UTF-8; \
+        fi \
+    fi\
+    # 生成中文locale(使用正确的语法)\
+    localedef -c -i zh_CN -f UTF-8 zh_CN.UTF-8 2>/dev/null || \
+        localedef -i zh_CN -f UTF-8 zh_CN.UTF-8 2>/dev/null || \
+        echo "Locale generation may have warnings, continuing..." \
     # 清理安装缓存 \
     rm -rf /var/cache/dnf; \
     dnf autoremove -y; \
     dnf clean all; \
     rm -rf \
             /var/cache/dnf \
-            /etc/yum.repos.d/rocky*.repo.bak \
             /opt /mnt /usr/games /usr/share/man /usr/share/doc \
             /tmp/* /var/tmp/*; \
     # 解决启动时的域名警告问题 \

@@ -60,7 +60,7 @@ jobs:
           # 如果没有找到符合纯数字格式的release，则跳过
           if [[ -z "$latest_release_tag" ]]; then
             echo "No release with pure numeric version format found, skipping"
-            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "skip=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -72,17 +72,17 @@ jobs:
           assets_b64=$(echo "$assets_response" | base64 -w 0)
           
           # 保存资源文件信息到输出
-          echo "assets_b64=$assets_b64" >> $GITHUB_OUTPUT
+          echo "assets_b64=$assets_b64" >> "$GITHUB_OUTPUT"
 
           # 对输出进行转义处理，防止特殊字符破坏格式
-          echo "latest_release_tag=$latest_release_tag" >> $GITHUB_OUTPUT
-          echo "latest_release_name=$latest_release_name" >> $GITHUB_OUTPUT
-          echo "latest_release_body<<EOF" >> $GITHUB_OUTPUT
-          echo "$latest_release_body" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-          echo "latest_release_url=$latest_release_url" >> $GITHUB_OUTPUT
-          echo "latest_release_id=$latest_release_id" >> $GITHUB_OUTPUT
-          echo "skip=false" >> $GITHUB_OUTPUT
+          echo "latest_release_tag=$latest_release_tag" >> "$GITHUB_OUTPUT"
+          echo "latest_release_name=$latest_release_name" >> "$GITHUB_OUTPUT"
+          echo "latest_release_body<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$latest_release_body" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+          echo "latest_release_url=$latest_release_url" >> "$GITHUB_OUTPUT"
+          echo "latest_release_id=$latest_release_id" >> "$GITHUB_OUTPUT"
+          echo "skip=false" >> "$GITHUB_OUTPUT"
 
 
 
@@ -93,10 +93,10 @@ jobs:
           # 检查本地是否已有该标签
           if git rev-parse -q --verify "refs/tags/${{ steps.get_remote_release.outputs.latest_release_tag }}" >/dev/null; then
             echo "Release already exists in local repository"
-            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "exists=true" >> "$GITHUB_OUTPUT"
           else
             echo "Release does not exist in local repository"
-            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: 下载远程仓库的Release资源文件
@@ -126,7 +126,7 @@ jobs:
           ls -la
           
           # 设置标志表示已下载资源文件
-          echo "downloaded=true" >> $GITHUB_OUTPUT
+          echo "downloaded=true" >> "$GITHUB_OUTPUT"
 
       - name: 创建新标签并发布（版本）
         if: steps.get_remote_release.outputs.skip == 'false' && steps.check_local_release.outputs.exists == 'false'
@@ -204,7 +204,7 @@ jobs:
       - name: 获取当前日期
         if: steps.get_remote_release.outputs.skip == 'false' && steps.check_local_release.outputs.exists == 'false'
         id: date
-        run: echo "date=$(date +'%Y%m%d')" >> $GITHUB_OUTPUT
+        run: echo "date=$(date +'%Y%m%d')" >> "$GITHUB_OUTPUT"
 
       # 构建并推送Build-Docker镜像
       - name: 构建并推送 Build-Docker 镜像
