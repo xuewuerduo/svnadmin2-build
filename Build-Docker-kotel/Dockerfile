@@ -51,7 +51,7 @@ RUN set -eux \
     # 配置时区 \
     echo "${TZ}" > /etc/timezone; \
     dnf install -y https://rpms.remirepo.net/enterprise/remi-release-9.rpm; \
-    dnf module enable -y php:remi-8.2; \
+    dnf module enable -y php:remi-8.4; \
     # 安装运行时依赖 \
     dnf install -y  \
         --setopt=install_weak_deps=False --nodocs \
@@ -115,10 +115,6 @@ RUN localedef -c -i zh_CN -f UTF-8 zh_CN.UTF-8 2>/dev/null || \
     localedef -i zh_CN -f UTF-8 zh_CN.UTF-8 2>/dev/null || \
     echo "Locale generation may have warnings, continuing..."
 
-# 设置环境变量
-ENV LANG=zh_CN.UTF-8
-ENV LC_ALL=zh_CN.UTF-8
-ENV LC_CTYPE=zh_CN.UTF-8
 # 设置环境变量
 ENV LANG=zh_CN.UTF-8
 ENV LC_ALL=zh_CN.UTF-8
