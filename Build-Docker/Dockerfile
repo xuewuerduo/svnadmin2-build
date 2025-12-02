@@ -77,7 +77,25 @@ RUN set -eux \
         cyrus-sasl-plain \
         cronie \
         at \
+        glibc-langpack-en \
+        glibc-langpack-zh \
+        glibc-all-langpacks \
+        glibc-locale-source \
+        langpacks-zh_CN \
         procps; \
+    # 创建字符映射文(解决UTF-8找不到的问题)\
+    if [ ! -f /usr/share/i18n/charmaps/UTF-8 ]; then \
+        if [ -f /usr/share/i18n/charmaps/UTF-8.gz ]; then \
+            gunzip -c /usr/share/i18n/charmaps/UTF-8.gz > /usr/share/i18n/charmaps/UTF-8; \
+        else \
+            echo "UTF-8 charmap not found, creating from locale source"; \
+            localedef --list-archive | grep UTF-8 || localedef -i en_US -f UTF-8 en_US.UTF-8; \
+        fi \
+    fi\
+    # 生成中文locale(使用正确的语法)\
+    localedef -c -i zh_CN -f UTF-8 zh_CN.UTF-8 2>/dev/null || \
+        localedef -i zh_CN -f UTF-8 zh_CN.UTF-8 2>/dev/null || \
+        echo "Locale generation may have warnings, continuing..." \
     # 清理安装缓存 \
     rm -rf /var/cache/dnf; \
     dnf autoremove -y; \
