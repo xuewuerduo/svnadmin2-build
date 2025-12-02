@@ -83,19 +83,6 @@ RUN set -eux \
         glibc-locale-source \
         langpacks-zh_CN \
         procps; \
-    # 创建字符映射文(解决UTF-8找不到的问题)\
-    if [ ! -f /usr/share/i18n/charmaps/UTF-8 ]; then \
-        if [ -f /usr/share/i18n/charmaps/UTF-8.gz ]; then \
-            gunzip -c /usr/share/i18n/charmaps/UTF-8.gz > /usr/share/i18n/charmaps/UTF-8; \
-        else \
-            echo "UTF-8 charmap not found, creating from locale source"; \
-            localedef --list-archive | grep UTF-8 || localedef -i en_US -f UTF-8 en_US.UTF-8; \
-        fi \
-    fi\
-    # 生成中文locale(使用正确的语法)\
-    localedef -c -i zh_CN -f UTF-8 zh_CN.UTF-8 2>/dev/null || \
-        localedef -i zh_CN -f UTF-8 zh_CN.UTF-8 2>/dev/null || \
-        echo "Locale generation may have warnings, continuing..." \
     # 清理安装缓存 \
     rm -rf /var/cache/dnf; \
     dnf autoremove -y; \
@@ -112,8 +99,26 @@ RUN set -eux \
     sed -i 's/listen.acl_users = apache,nginx/listen.acl_users = apache/g' /etc/php-fpm.d/www.conf; \
     chown -R apache:apache /var/www/html; \
     # 赋予启动脚本执行权限 \
-    chmod +x /home/Start.sh \
+    chmod +x /home/Start.sh
+# 创建字符映射文件（解决UTF-8找不到的问题）
+RUN if [ ! -f /usr/share/i18n/charmaps/UTF-8 ]; then \
+    if [ -f /usr/share/i18n/charmaps/UTF-8.gz ]; then \
+        gunzip -c /usr/share/i18n/charmaps/UTF-8.gz > /usr/share/i18n/charmaps/UTF-8; \
+    else \
+        echo "UTF-8 charmap not found, creating from locale source"; \
+        localedef --list-archive | grep UTF-8 || localedef -i en_US -f UTF-8 en_US.UTF-8; \
+    fi \
+    fi
 
+# 生成中文locale（使用正确的语法）
+RUN localedef -c -i zh_CN -f UTF-8 zh_CN.UTF-8 2>/dev/null || \
+    localedef -i zh_CN -f UTF-8 zh_CN.UTF-8 2>/dev/null || \
+    echo "Locale generation may have warnings, continuing..."
+
+# 设置环境变量
+ENV LANG=zh_CN.UTF-8
+ENV LC_ALL=zh_CN.UTF-8
+ENV LC_CTYPE=zh_CN.UTF-8
 # 设置环境变量
 ENV LANG=zh_CN.UTF-8
 ENV LC_ALL=zh_CN.UTF-8
