@@ -40,65 +40,79 @@ COPY Start.sh /home/Start.sh
 COPY favicon.ico /var/www/html/favicon.ico
 
 # 安装系统依赖和运行环境
-RUN set -eux \
-    # 配置时区 \
-    echo "${TZ}" > /etc/timezone; \
-    dnf install -y https://rpms.remirepo.net/enterprise/remi-release-9.rpm; \
-    # dnf install -y https://mirrors.aliyun.com/remi/enterprise/remi-release-10.rpm; \
-    # echo -e "[WandiscoSVN]\nname=Wandisco SVN Repo\nbaseurl=https://opensource.wandisco.com/centos/9/svn-1.14/RPMS/x86_64/\nenabled=1\ngpgcheck=0" > /etc/yum.repos.d/wandisco-svn.repo; \
-    dnf module enable -y php:remi-8.4; \
-    # ed -e 's|^mirrorlist=|#mirrorlist=|g' \
-    #    -e 's|^#baseurl=http://dl.rockylinux.org/$contentdir|baseurl=https://mirrors.aliyun.com/rockylinux|g' \
-    #    -i.bak \
-    #    /etc/yum.repos.d/rocky*.repo; \
-    # 安装运行时依赖 \
-    dnf install -y  \
-        --setopt=install_weak_deps=False --nodocs \
-        httpd \
-        mod_dav_svn \
-        mod_ldap \
-        subversion \
-        subversion-tools \
-        php \
-        php-common \
-        php-cli \
-        php-fpm \
-        php-json \
-        php-mysqlnd \
-        php-pdo \
-        php-process \
-        php-gd \
-        php-bcmath \
-        php-ldap \
-        php-mbstring \
-        cyrus-sasl \
-        cyrus-sasl-lib \
-        cyrus-sasl-plain \
-        cronie \
-        at \
-        glibc-langpack-en \
-        glibc-langpack-zh \
-        glibc-all-langpacks \
-        glibc-locale-source \
-        langpacks-zh_CN \
-        procps; \
-    # 清理安装缓存 \
-    rm -rf /var/cache/dnf; \
-    dnf autoremove -y; \
-    dnf clean all; \
-    rm -rf \
-            /var/cache/dnf \
-            /opt /mnt /usr/games /usr/share/man /usr/share/doc \
-            /tmp/* /var/tmp/*; \
-    # 解决启动时的域名警告问题 \
-    echo "ServerName localhost" >> /etc/httpd/conf/httpd.conf; \
-    mkdir -p /run/php-fpm/; \
-    # PHP安全配置 \
-    sed -i 's/expose_php = On/expose_php = Off/g' /etc/php.ini; \
-    sed -i 's/listen.acl_users = apache,nginx/listen.acl_users = apache/g' /etc/php-fpm.d/www.conf; \
-    chown -R apache:apache /var/www/html; \
-    # 赋予启动脚本执行权限 \
-    chmod +x /home/Start.sh \
+# 1. 配置时区
+RUN echo "${TZ}" > /etc/timezone
+
+# 2. 安装 REMI 仓库
+RUN dnf install -y https://rpms.remirepo.net/enterprise/remi-release-9.rpm
+
+# 3. 启用 PHP 8.2 模块
+RUN dnf module enable -y php:remi-8.2
+
+# 4. 安装运行时依赖
+RUN dnf install -y \
+    --setopt=install_weak_deps=False --nodocs \
+    httpd \
+    mod_dav_svn \
+    mod_ldap \
+    subversion \
+    subversion-tools \
+    php \
+    php-common \
+    php-cli \
+    php-fpm \
+    php-json \
+    php-mysqlnd \
+    php-pdo \
+    php-process \
+    php-gd \
+    php-bcmath \
+    php-ldap \
+    php-mbstring \
+    cyrus-sasl \
+    cyrus-sasl-lib \
+    cyrus-sasl-plain \
+    cronie \
+    at \
+    glibc-langpack-en \
+    glibc-langpack-zh \
+    glibc-all-langpacks \
+    glibc-locale-source \
+    langpacks-zh_CN \
+    procps
+
+# 5. 清理安装缓存
+RUN rm -rf /var/cache/dnf
+
+# 6. 清理不需要的包
+RUN dnf autoremove -y
+
+# 7. 清理 dnf 缓存
+RUN dnf clean all
+
+# 8. 清理其他不需要的文件
+RUN rm -rf \
+    /var/cache/dnf \
+    /opt /mnt /usr/games /usr/share/man /usr/share/doc \
+    /tmp/* /var/tmp/*
+
+# 9. 解决启动时的域名警告问题
+RUN echo "ServerName localhost" >> /etc/httpd/conf/httpd.conf
+
+# 10. 创建 php-fpm 运行目录
+RUN mkdir -p /run/php-fpm/
+
+# 11. PHP 安全配置
+RUN sed -i 's/expose_php = On/expose_php = Off/g' /etc/php.ini
+
+# 12. 配置 php-fpm ACL 用户
+RUN sed -i 's/listen.acl_users = apache,nginx/listen.acl_users = apache/g' /etc/php-fpm.d/www.conf
+
+# 13. 设置目录权限
+RUN chown -R apache:apache /var/www/html
+
+# 14. 赋予启动脚本执行权限
+RUN chmod +x /home/Start.sh
 
 # 创建字符映射文件（解决UTF-8找不到的问题）
 RUN if [ ! -f /usr/share/i18n/charmaps/UTF-8 ]; then \
