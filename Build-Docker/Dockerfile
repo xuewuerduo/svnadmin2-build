@@ -7,8 +7,9 @@ ENV TZ=Asia/Shanghai
 WORKDIR /home
 # 从GitHub拉取项目
 RUN apt-get install -y git; \
-    git clone https://gitee.com/witersen/SvnAdminV2.0.git; \
-    npm config set registry https://registry.npmmirror.com;
+    git clone https://github.com/witersen/SvnAdminV2.0.git;
+
+    # npm config set registry https://registry.npmmirror.com;
 
 WORKDIR /home/SvnAdminV2.0
 
@@ -36,14 +37,21 @@ COPY --from=builder /home/SvnAdminV2.0/01.web/dist/ /var/www/html/
 COPY --from=builder /home/SvnAdminV2.0/02.php /var/www/html/
 COPY --from=builder /home/SvnAdminV2.0/03.cicd/svnadmin_docker/data/ /templete/
 COPY Start.sh /home/Start.sh
-COPY favicon.ico /var/www/html/
+COPY favicon.ico /var/www/html/favicon.ico
 
 # 安装系统依赖和运行环境
 RUN set -eux \
     # 配置时区 \
     echo "${TZ}" > /etc/timezone; \
     dnf install -y https://rpms.remirepo.net/enterprise/remi-release-9.rpm; \
-    dnf module enable -y php:remi-8.2; \
+    # dnf install -y https://mirrors.aliyun.com/remi/enterprise/remi-release-10.rpm; \
+    # echo -e "[WandiscoSVN]\nname=Wandisco SVN Repo\nbaseurl=https://opensource.wandisco.com/centos/9/svn-1.14/RPMS/x86_64/\nenabled=1\ngpgcheck=0" > /etc/yum.repos.d/wandisco-svn.repo; \
+    dnf module enable -y php:remi-8.4; \
+    # ed -e 's|^mirrorlist=|#mirrorlist=|g' \
+    #    -e 's|^#baseurl=http://dl.rockylinux.org/$contentdir|baseurl=https://mirrors.aliyun.com/rockylinux|g' \
+    #    -i.bak \
+    #    /etc/yum.repos.d/rocky*.repo; \
+    # 安装运行时依赖 \
     # 安装运行时依赖 \
     dnf install -y  \
         --setopt=install_weak_deps=False --nodocs \
@@ -94,6 +102,7 @@ RUN set -eux \
     dnf clean all; \
     rm -rf \
             /var/cache/dnf \
+            /etc/yum.repos.d/rocky*.repo.bak \
             /opt /mnt /usr/games /usr/share/man /usr/share/doc \
             /tmp/* /var/tmp/*; \
     # 解决启动时的域名警告问题 \

@@ -84,8 +84,6 @@ jobs:
           echo "latest_release_id=$latest_release_id" >> "$GITHUB_OUTPUT"
           echo "skip=false" >> "$GITHUB_OUTPUT"
 
-
-
       - name: 检查此仓库中是否已存在该发布版本
         if: steps.get_remote_release.outputs.skip == 'false'
         id: check_local_release
@@ -98,6 +96,34 @@ jobs:
             echo "Release does not exist in local repository"
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: 下载 SvnAdminV2.0 源码并打包
+        if: steps.get_remote_release.outputs.skip == 'false' && steps.check_local_release.outputs.exists == 'false'
+        run: |
+          # 创建源码目录
+          mkdir -p repos
+          
+          # 克隆 SvnAdminV2.0 仓库
+          git clone https://github.com/witersen/SvnAdminV2.0.git repos/SvnAdminV2.0
+          
+          # 切换到对应的发布版本
+          cd repos/SvnAdminV2.0
+          git checkout tags/${{ steps.get_remote_release.outputs.latest_release_tag }}
+          
+          # 创建需要打包的目录结构
+          cd ../..
+          mkdir -p svnadmin-code/{01.web,02.php,03.template}
+          
+          # 复制需要的目录
+          cp -r repos/SvnAdminV2.0/01.web/* svnadmin-code/01.web/
+          cp -r repos/SvnAdminV2.0/02.php/* svnadmin-code/02.php/
+          cp -r repos/SvnAdminV2.0/03.cicd/svnadmin_docker/data/* svnadmin-code/03.template/
+          
+          # 打包需要的文件
+          tar -czf SvnAdminV2.0-${{ steps.get_remote_release.outputs.latest_release_tag }}.tar.gz svnadmin-code
+          
+          # 清理临时目录
+          rm -rf repos svnadmin-code
 
       - name: 下载远程仓库的Release资源文件
         if: steps.get_remote_release.outputs.skip == 'false' && steps.check_local_release.outputs.exists == 'false'
@@ -134,6 +160,10 @@ jobs:
           # 配置git
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          
+          # 添加源码包到git
+          git add SvnAdminV2.0-${{ steps.get_remote_release.outputs.latest_release_tag }}.tar.gz
+          git commit -m "Add SvnAdminV2.0 source code for ${{ steps.get_remote_release.outputs.latest_release_tag }}"
           
           # 创建标签
           git tag ${{ steps.get_remote_release.outputs.latest_release_tag }}
@@ -181,6 +211,20 @@ jobs:
             fi
           done
 
+      - name: 上传源码包到新创建的Release
+        if: steps.get_remote_release.outputs.skip == 'false' && steps.check_local_release.outputs.exists == 'false'
+        run: |
+          # 上传源码包到新创建的release
+          release_id=${{ steps.create_release.outputs.id }}
+          
+          echo "Uploading source code package: SvnAdminV2.0-${{ steps.get_remote_release.outputs.latest_release_tag }}.tar.gz"
+          curl -X POST \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Content-Type: application/octet-stream" \
+            --data-binary @SvnAdminV2.0-${{ steps.get_remote_release.outputs.latest_release_tag }}.tar.gz \
+            "https://uploads.github.com/repos/${{ github.repository }}/releases/$release_id/assets?name=SvnAdminV2.0-${{ steps.get_remote_release.outputs.latest_release_tag }}.tar.gz" \
+            || echo "Failed to upload source code package"
+
       # 构建并推送Docker镜像
       - name: 设置 Docker Buildx
         if: steps.get_remote_release.outputs.skip == 'false' && steps.check_local_release.outputs.exists == 'false'
@@ -213,8 +257,6 @@ jobs:
         with:
           context: ./Build-Docker
           platforms: linux/amd64,linux/arm64
-          readme_filepath: ./README.md
-          short-description: "基于web的SVN管理系统，支持HTTP协议、SVN协议、支持LDAP认证、Docker部署"
           push: true
           tags: |
             xuewuerduo/svnadmin2:latest
@@ -224,14 +266,21 @@ jobs:
       #      ghcr.io/${{ github.repository_owner }}/svnadmin2:${{ steps.get_remote_release.outputs.latest_release_tag }}
       #      ghcr.io/${{ github.repository_owner }}/svnadmin2:${{ steps.date.outputs.date }}
 
+      - name: 更新镜像描述和说明
+        uses: peter-evans/dockerhub-description@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: xuewuerduo/svnadmin2
+          short-description: "基于web的SVN管理系统，支持HTTP协议、SVN协议、支持LDAP认证、Docker部署"
+          readme-filepath: Build-Docker/README.md
+
       - name: 构建并推送 Build-Docker-kotel 镜像
         if: steps.get_remote_release.outputs.skip == 'false' && steps.check_local_release.outputs.exists == 'false'
         uses: docker/build-push-action@v5
         with:
           context: ./Build-Docker-kotel
           platforms: linux/amd64,linux/arm64
-          readme_filepath: ./README.md
-          short-description: "基于web的SVN管理系统，支持HTTP协议、SVN协议、支持LDAP认证、Docker部署"
           push: true
           tags: |
             xuewuerduo/svnadmin2-kotel:latest
@@ -240,3 +289,116 @@ jobs:
       #      ghcr.io/${{ github.repository_owner }}/svnadmin2-kotel:latest
       #      ghcr.io/${{ github.repository_owner }}/svnadmin2-kotel:${{ steps.get_remote_release.outputs.latest_release_tag }}
       #       ghcr.io/${{ github.repository_owner }}/svnadmin2-kotel:${{ steps.date.outputs.date }}
+
+      - name: 更新镜像描述和说明
+        uses: peter-evans/dockerhub-description@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: xuewuerduo/svnadmin2-kotel
+          short-description: "基于大佬的镜像进行了一些小调整，具体看介绍"
+          readme-filepath: Build-Docker-kotel/README.md
+
+  # 新增job: 创建符合要求的源代码发布包
+  create-source-code-release:
+    needs: check-release-and-create
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: 下载远程仓库源码
+        run: |
+          # 创建临时目录
+          mkdir -p temp_repos
+          
+          # 克隆远程仓库
+          git clone https://github.com/witersen/SvnAdminV2.0.git temp_repos/SvnAdminV2.0
+          
+          # 进入目录并查看标签
+          cd temp_repos/SvnAdminV2.0
+          latest_tag=$(git describe --tags `git rev-list --tags --max-count=1`)
+          echo "Latest tag: $latest_tag"
+          git checkout $latest_tag
+
+      - name: 创建原版源代码包
+        run: |
+          # 创建原版源代码目录结构
+          mkdir -p "原版-Source Code"/{01.web,02.php,03.template}
+          
+          # 复制远程仓库的源代码
+          cp -r temp_repos/SvnAdminV2.0/01.web/* "原版-Source Code/01.web/"
+          cp -r temp_repos/SvnAdminV2.0/02.php/* "原版-Source Code/02.php/"
+          
+          # 复制03.cicd/svnadmin_docker/data目录下的文件到03.template
+          if [ -d "temp_repos/SvnAdminV2.0/03.cicd/svnadmin_docker/data" ]; then
+            cp -r temp_repos/SvnAdminV2.0/03.cicd/svnadmin_docker/data/* "原版-Source Code/03.template/"
+          fi
+          
+          # 复制Build-Docker文件夹下的文件
+          cp -r Build-Docker/* "原版-Source Code/"
+          
+          # 打包原版源代码
+          tar -czf "原版-Source Code.tar.gz" "原版-Source Code"
+          
+          echo "原版源代码包创建完成:"
+          ls -la "原版-Source Code.tar.gz"
+
+      - name: 创建修改版源代码包
+        run: |
+          # 创建修改版源代码目录结构（基于原版）
+          cp -r "原版-Source Code" "修改版-Source Code"
+          
+          # 使用Build-Docker-kotel文件夹下的文件覆盖
+          cp -r Build-Docker-kotel/* "修改版-Source Code/"
+          
+          # 特殊处理01.web和02.php目录（使用kotel版本的目录结构）
+          rm -rf "修改版-Source Code/01.web" "修改版-Source Code/02.php"
+          cp -r Build-Docker-kotel/01.web "修改版-Source Code/"
+          cp -r Build-Docker-kotel/02.php "修改版-Source Code/"
+          
+          # 打包修改版源代码
+          tar -czf "修改版-Source Code.tar.gz" "修改版-Source Code"
+          
+          echo "修改版源代码包创建完成:"
+          ls -la "修改版-Source Code.tar.gz"
+
+      - name: 上传源代码包到 GitHub Actions Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-code-packages
+          path: |
+            原版-Source Code.tar.gz
+            修改版-Source Code.tar.gz
+
+      - name: 获取 Release 信息
+        id: get_release
+        run: |
+          # 获取最新创建的 Release ID
+          release_id=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/latest" | \
+            jq -r '.id')
+          echo "release_id=$release_id" >> $GITHUB_OUTPUT
+
+      - name: 上传源代码包到 Release
+        if: steps.get_release.outputs.release_id != ''
+        run: |
+          release_id=${{ steps.get_release.outputs.release_id }}
+          
+          # 上传原版源代码包
+          echo "Uploading 原版-Source Code.tar.gz"
+          curl -X POST \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Content-Type: application/octet-stream" \
+            --data-binary @"原版-Source Code.tar.gz" \
+            "https://uploads.github.com/repos/${{ github.repository }}/releases/$release_id/assets?name=原版-Source Code.tar.gz" \
+            || echo "Failed to upload 原版-Source Code.tar.gz"
+          
+          # 上传修改版源代码包
+          echo "Uploading 修改版-Source Code.tar.gz"
+          curl -X POST \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Content-Type: application/octet-stream" \
+            --data-binary @"修改版-Source Code.tar.gz" \
+            "https://uploads.github.com/repos/${{ github.repository }}/releases/$release_id/assets?name=修改版-Source Code.tar.gz" \
+            || echo "Failed to upload 修改版-Source Code.tar.gz"
